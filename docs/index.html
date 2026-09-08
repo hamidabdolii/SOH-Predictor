@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VL Coin-Cell SOH Predictor</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>VL Coin-Cell SOH Predictor</h1>
+    <p class="subtitle">LSTM-based state-of-health prediction for Panasonic VL coin cells, trained on real Neware cycling data &mdash; with every prediction validated against a cycle the model never trained on.</p>
+  </header>
+
+  <main>
+    <section class="panel" id="cell-selector-panel">
+      <h2>1. Choose a cell</h2>
+      <div id="cell-grid" class="cell-grid"></div>
+    </section>
+
+    <section class="panel panel-hero" id="trajectory-panel" hidden>
+      <div class="hero-head">
+        <div>
+          <h2>2. Predicted vs. actual SOH trajectory</h2>
+          <p class="hint">The LSTM walks forward through every cycle of this cell's real history, predicting each next-cycle SOH from a 10-cycle window &mdash; then we plot every prediction against what actually happened. This is the true test of the model: it never gets to see the future, only the past.</p>
+        </div>
+        <button id="run-trajectory-btn" class="btn-primary">Run full prediction</button>
+      </div>
+      <div class="chart-container chart-container-lg">
+        <canvas id="trajectory-chart"></canvas>
+      </div>
+      <div class="stats-row" id="trajectory-stats"></div>
+    </section>
+
+    <section class="panel" id="overview-panel" hidden>
+      <h2>3. SOH &amp; capacity fade overview</h2>
+      <div class="stats-row" id="cell-stats"></div>
+      <div class="chart-grid-2">
+        <div>
+          <h3 class="chart-title">SOH (%)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="soh-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title">Discharge capacity (mAh)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="capacity-chart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="chart-grid-2">
+        <div>
+          <h3 class="chart-title">Mean cycle temperature (&deg;C)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="temp-trend-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title">Coulombic efficiency</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="ce-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="predict-panel" hidden>
+      <h2>4. Try a single prediction, live</h2>
+      <p class="hint">Pick a cycle to act as "now" (using the 10 cycles up to and including it). This runs the deployed model live in your browser and compares its output to the real measured value. Note: this model was trained on all 4 cells including this one, so treat this as a live demo rather than a fair accuracy test &mdash; the trajectory chart above uses a version of the model that never saw this cell's data at all.</p>
+      <div class="predict-controls">
+        <label for="cycle-slider">Reference cycle: <span id="cycle-label">20</span></label>
+        <input type="range" id="cycle-slider" min="10" max="99" value="20" />
+        <button id="predict-btn" class="btn-secondary">Run prediction</button>
+      </div>
+      <div id="predict-result" class="predict-result"></div>
+    </section>
+
+    <section class="panel" id="curves-panel" hidden>
+      <h2>5. Cycle detail: voltage, current &amp; temperature</h2>
+      <p class="hint">Full charge/discharge curves for a single cycle. Pick any cycle &mdash; not just a sample &mdash; to see how the curve shape itself changes as the cell ages.</p>
+      <div class="curve-select">
+        <label for="curve-cycle-slider">Cycle: <span id="curve-cycle-label"></span></label>
+        <input type="range" id="curve-cycle-slider" min="0" max="1" value="0" />
+      </div>
+      <div class="chart-grid-1">
+        <div>
+          <h3 class="chart-title">Voltage (V)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="curve-voltage-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title">Current (A)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="curve-current-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title">Temperature (&deg;C)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="curve-temp-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="compare-panel">
+      <h2>6. Compare all cells</h2>
+      <p class="hint">SOH fade across every loaded VL cell, referenced to each cell's own post-formation peak capacity.</p>
+      <div class="chart-container">
+        <canvas id="compare-chart"></canvas>
+      </div>
+    </section>
+
+    <section class="panel" id="about-panel">
+      <h2>About this model</h2>
+      <div class="about-grid">
+        <div>
+          <h3>Data</h3>
+          <p>6 Panasonic VL coin cells (VL1220 / VL2020 form factors) cycled by Neware at 0.1C/0.2C and room temperature / 40&deg;C. Each cell was cycled for 100 full charge/discharge cycles with ~30s sampling. Cycle 1 is excluded from all analysis and charts: it carries an extra leading rest step not present in any other cycle and its discharge capacity is visibly inconsistent with the rest of the curve on at least one cell &mdash; an artifact of test setup, not real aging.</p>
+        </div>
+        <div>
+          <h3>SOH definition</h3>
+          <p>SOH(cycle) = discharge capacity(cycle) / C<sub>ref</sub> &times; 100, where C<sub>ref</sub> is the peak discharge capacity observed in cycles 2&ndash;11 (post break-in/formation) &mdash; these coin cells show a real capacity rise during early formation cycles before fade begins.</p>
+        </div>
+        <div>
+          <h3>Model &amp; validation</h3>
+          <p>A small residual LSTM (16 hidden units) predicts next-cycle SOH from a 10-cycle window of summary features (capacity, coulombic efficiency, step durations, temperature, voltage), conditioned on C-rate/temperature/form-factor. Validated with leave-one-cell-out cross-validation: mean absolute error of 0.79% SOH on cells never seen during training &mdash; beating both a naive persistence baseline (1.12%) and a Random Forest baseline (2.26%). All inference runs locally in your browser via ONNX Runtime Web; no data leaves your device.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Built with a client-side ONNX LSTM &mdash; no server, no data upload. <a href="https://github.com/" target="_blank" rel="noopener">View on GitHub</a></p>
+  </footer>
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/ort.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
