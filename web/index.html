@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battery SOH Predictor</title>
+  <!-- Inline data-URI favicon: keeps the app fully self-contained (no extra
+       request, no 404 on hosts that don't have a favicon.ico at the root). -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='7' width='17' height='11' rx='2.5' fill='none' stroke='%235eb1ff' stroke-width='2'/%3E%3Crect x='20' y='10.5' width='2.5' height='4' rx='1' fill='%235eb1ff'/%3E%3Cpath d='M12.5 8.5 8 13.2h3.2l-.7 4.3 4.5-5.1h-3.2z' fill='%23ff9f5e'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Inline SVG icon sprite sheet: zero external requests (works offline / on
+       GitHub Pages), reused everywhere via <svg class="icon"><use href="#icon-x"/></svg> -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <symbol id="icon-battery" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><rect x="6" y="9.5" width="9" height="5" rx="1" fill="currentColor"/></symbol>
+      <symbol id="icon-thermometer" viewBox="0 0 24 24"><path d="M12 3a2.5 2.5 0 0 0-2.5 2.5v8.55a4 4 0 1 0 5 0V5.5A2.5 2.5 0 0 0 12 3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="17.5" r="2.2" fill="currentColor"/><line x1="12" y1="7" x2="12" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      <symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-voltage" viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></symbol>
+      <symbol id="icon-trend" viewBox="0 0 24 24"><path d="M3 17 9 9l4 4 8-9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 4h5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-check-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v6c0 4.5 3 7.5 7.5 9 4.5-1.5 7.5-4.5 7.5-9V6L12 3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.5 12.3 2.4 2.4 4.6-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-brain" viewBox="0 0 24 24"><path d="M9 4.5a2.5 2.5 0 0 0-2.5 2.5v.2A2.8 2.8 0 0 0 4.5 10v1a2.6 2.6 0 0 0 1 2.05V14a3 3 0 0 0 3 3h.5v1.5A2.5 2.5 0 0 0 11.5 21h1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 4.5a2.5 2.5 0 0 1 2.5 2.5v.2A2.8 2.8 0 0 1 19.5 10v1a2.6 2.6 0 0 1-1 2.05V14a3 3 0 0 1-3 3H15v1.5A2.5 2.5 0 0 1 12.5 21h-1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="4.5" x2="12" y2="21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3.5 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m3 13 9 5 9-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="M6 4.5v15l14-7.5-14-7.5Z" fill="currentColor"/></symbol>
+      <symbol id="icon-cycle" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 3v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6.2L5.3 18a2 2 0 0 0 1.8 3h9.8a2 2 0 0 0 1.8-3L14 9.2V3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 15h9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      <symbol id="icon-scale" viewBox="0 0 24 24"><path d="M12 3v18M6 7h12M6 7 3.5 13a2.5 2.5 0 0 0 5 0L6 7Zm12 0-2.5 6a2.5 2.5 0 0 0 5 0L18 7Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-current" viewBox="0 0 24 24"><path d="M4 16.5c2-4.5 3.4-7 4.6-7 1.6 0 1.6 5 3.2 5 1.3 0 2.5-2.6 4.4-7M18.6 7.5h2.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4" cy="16.5" r="1.3" fill="currentColor"/></symbol>
+      <symbol id="icon-r2" viewBox="0 0 24 24"><path d="M3.5 19.5 8 13l3.6 3.2L20 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="13" r="1.5" fill="currentColor"/><circle cx="11.6" cy="16.2" r="1.5" fill="currentColor"/><circle cx="16" cy="10" r="1.5" fill="currentColor"/><path d="M3.5 21h17" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/></symbol>
+      <symbol id="icon-chip" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="10.2" y="10.2" width="3.6" height="3.6" rx="0.8" fill="currentColor"/><path d="M10 7V4M14 7V4M10 20v-3M14 20v-3M7 10H4M7 14H4M20 10h-3M20 14h-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="icon-github" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.03a9.6 9.6 0 0 1 5 0c1.91-1.3 2.75-1.03 2.75-1.03.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" fill="currentColor"/></symbol>
+    </defs>
+  </svg>
+
+  <header class="app-header">
+    <h1><svg class="icon icon-lg icon-header"><use href="#icon-battery"/></svg> Battery SOH Predictor</h1>
+    <p class="subtitle">LSTM-based state-of-health prediction across Panasonic VL coin cells and Oxford pouch cells &mdash; with every prediction validated on a cell the model never trained on (leave-one-cell-out).</p>
+    <div class="stats-row" id="fleet-stats"></div>
+  </header>
+
+  <main>
+    <section class="panel" id="cell-selector-panel">
+      <h2><span class="step-badge">1</span> Choose a cell</h2>
+      <div id="cell-grid"></div>
+    </section>
+
+    <section class="panel panel-hero" id="trajectory-panel" hidden>
+      <div class="hero-head">
+        <div>
+          <h2><span class="step-badge">2</span> <svg class="icon icon-accent"><use href="#icon-target"/></svg> Predicted vs. actual SOH trajectory</h2>
+          <p class="hint">The model walks forward through every cycle of this cell's real history, predicting each next-cycle SOH from a 10-cycle window &mdash; then we plot every prediction against what actually happened. This is the true test of the model: it never gets to see the future, only the past.</p>
+        </div>
+        <button id="run-trajectory-btn" class="btn-primary"><svg class="icon"><use href="#icon-play"/></svg> Run full prediction</button>
+      </div>
+      <div class="model-picker">
+        <span class="model-picker-label"><svg class="icon icon-sm"><use href="#icon-chip"/></svg> Model architecture</span>
+        <div class="model-picker-options" id="model-picker-options"></div>
+      </div>
+      <div class="chart-container chart-container-lg">
+        <canvas id="trajectory-chart"></canvas>
+      </div>
+      <div class="stats-row" id="trajectory-stats"></div>
+      <p class="hint metric-note">
+        <strong>pts</strong> = percentage points of SOH. An error of 0.50&nbsp;pts means the prediction was off by half a
+        point of SOH (e.g. 91.5% predicted vs. 92.0% actual) &mdash; written this way rather than "%" so it isn't mistaken
+        for a relative error. <strong>R&sup2;</strong> is the share of this cell's SOH variation the model explains: 1.0 is
+        perfect, 0 is no better than always guessing the cell's mean. It is computed over the predictions revealed so far,
+        so it moves as the run progresses.
+      </p>
+    </section>
+
+    <section class="panel" id="overview-panel" hidden>
+      <h2><span class="step-badge">3</span> SOH &amp; capacity fade overview</h2>
+      <div class="stats-row" id="cell-stats"></div>
+      <div class="chart-grid-2">
+        <div>
+          <h3 class="chart-title"><svg class="icon icon-sm"><use href="#icon-battery"/></svg> SOH (%)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="soh-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title"><svg class="icon icon-sm"><use href="#icon-layers"/></svg> Discharge capacity (mAh)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="capacity-chart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="chart-grid-2">
+        <div>
+          <h3 class="chart-title"><svg class="icon icon-sm"><use href="#icon-thermometer"/></svg> Mean cycle temperature (&deg;C)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="temp-trend-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title"><svg class="icon icon-sm"><use href="#icon-cycle"/></svg> Coulombic efficiency</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="ce-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="predict-panel" hidden>
+      <h2><span class="step-badge">4</span> Try a single prediction, live</h2>
+      <p class="hint">Pick a cycle to act as "now" (using the 10 cycles up to and including it). This runs the currently selected architecture (<strong id="predict-arch-label">LSTM</strong>) live in your browser and compares its output to the real measured value. Note: this deployed model was trained on all 12 cells including this one, so treat it as a live demo rather than a fair accuracy test &mdash; the trajectory chart above uses a version that never saw this cell's data at all.</p>
+      <div class="predict-controls">
+        <label for="cycle-slider"><svg class="icon icon-sm"><use href="#icon-cycle"/></svg> Reference cycle: <span id="cycle-label">20</span></label>
+        <input type="range" id="cycle-slider" min="10" max="99" value="20" />
+        <button id="predict-btn" class="btn-secondary"><svg class="icon"><use href="#icon-brain"/></svg> Run prediction</button>
+      </div>
+      <div id="predict-result" class="predict-result"></div>
+    </section>
+
+    <section class="panel" id="curves-panel" hidden>
+      <h2><span class="step-badge">5</span> Cycle detail: voltage, current &amp; temperature</h2>
+      <p class="hint">Full charge/discharge curves for a single cycle. Pick any cycle &mdash; not just a sample &mdash; to see how the curve shape itself changes as the cell ages.</p>
+      <div class="curve-select">
+        <label for="curve-cycle-slider"><svg class="icon icon-sm"><use href="#icon-cycle"/></svg> Cycle: <span id="curve-cycle-label"></span></label>
+        <input type="range" id="curve-cycle-slider" min="0" max="1" value="0" />
+      </div>
+      <div class="chart-grid-1">
+        <div>
+          <h3 class="chart-title"><svg class="icon icon-sm"><use href="#icon-voltage"/></svg> Voltage (V)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="curve-voltage-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title"><svg class="icon icon-sm"><use href="#icon-current"/></svg> Current (A)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="curve-current-chart"></canvas>
+          </div>
+        </div>
+        <div>
+          <h3 class="chart-title"><svg class="icon icon-sm"><use href="#icon-thermometer"/></svg> Temperature (&deg;C)</h3>
+          <div class="chart-container chart-container-sm">
+            <canvas id="curve-temp-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="compare-panel">
+      <h2><span class="step-badge">6</span> Compare all cells</h2>
+      <p class="hint">SOH fade across every loaded cell &mdash; VL coin cells and Oxford pouch cells alike &mdash; each referenced to its own dataset-native SOH convention (see "About this model" below).</p>
+      <div class="chart-container">
+        <canvas id="compare-chart"></canvas>
+      </div>
+    </section>
+
+    <section class="panel" id="about-panel">
+      <h2><svg class="icon icon-accent"><use href="#icon-check-shield"/></svg> About this model</h2>
+      <div class="about-grid">
+        <div>
+          <h3><svg class="icon icon-sm"><use href="#icon-flask"/></svg> Data</h3>
+          <p><strong>VL coin cells (4):</strong> Panasonic VL1220 / VL2020 form factors cycled by Neware at 0.2C, room temperature / 40&deg;C, ~100 cycles each with ~30s sampling. Cycle 1 is excluded: it carries an extra leading rest step and inconsistent discharge capacity on at least one cell &mdash; a test-setup artifact, not real aging.</p>
+          <p><strong>Oxford pouch cells (8):</strong> 0.74&nbsp;Ah pouch cells (cells 1_1&ndash;1_8), CCCV cycling at 40&deg;C, 45&ndash;78 cycles each with per-sample voltage/current/temperature logging. Charge/discharge summary features (durations, CV tail, coulombic efficiency) are derived from the raw current/voltage/phase traces via a purpose-built adapter, since this dataset has no discrete step-type labels the way the Neware exports do.</p>
+        </div>
+        <div>
+          <h3><svg class="icon icon-sm"><use href="#icon-scale"/></svg> SOH definition</h3>
+          <p><strong>VL cells:</strong> SOH(cycle) = discharge capacity(cycle) / C<sub>ref</sub> &times; 100, where C<sub>ref</sub> is the peak discharge capacity observed in cycles 2&ndash;11 (post break-in/formation) &mdash; these coin cells show a real capacity rise during early formation cycles before fade begins.</p>
+          <p><strong>Oxford cells:</strong> SOH(cycle) = capacity(cycle) / rated capacity (0.74&nbsp;Ah) &times; 100 &mdash; the dataset's own established convention; no formation rise is present so no separate reference-capacity step is needed.</p>
+        </div>
+        <div>
+          <h3><svg class="icon icon-sm"><use href="#icon-brain"/></svg> Model &amp; validation</h3>
+          <p id="about-model-text">A small residual LSTM (16 hidden units) predicts next-cycle SOH from a 10-cycle window of summary features (capacity, coulombic efficiency, step durations, temperature, voltage), conditioned on C-rate/temperature/form-factor. Validated with leave-one-cell-out cross-validation across every cell in the pool. All inference runs locally in your browser via ONNX Runtime Web; no data leaves your device.</p>
+        </div>
+      </div>
+      <div class="loco-table-wrap">
+        <h3><svg class="icon icon-sm"><use href="#icon-chip"/></svg> Architecture comparison (mean over all 12 held-out cells)</h3>
+        <p class="hint">Every architecture below was trained and scored under the identical leave-one-cell-out protocol, so these are directly comparable. <strong>Pooled R&sup2;</strong> scores all cells' predictions together in one go; <strong>mean R&sup2;</strong> averages the per-cell values, which is the harsher number because a cell with a narrow SOH span has little variance to explain.</p>
+        <div class="table-scroll">
+          <table class="loco-table" id="arch-table">
+            <thead>
+              <tr><th>Method</th><th>Mean MAE (pts)</th><th>Mean RMSE (pts)</th><th>Mean R&sup2;</th><th>Pooled R&sup2;</th><th>Params</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <h3 class="loco-subhead"><svg class="icon icon-sm"><use href="#icon-scale"/></svg> Per-cell results &mdash; <span id="loco-table-arch-label">LSTM</span></h3>
+        <p class="hint">Switching the model architecture above updates this table too.</p>
+        <div class="table-scroll">
+          <table class="loco-table" id="loco-table">
+            <thead>
+              <tr><th>Cell</th><th>Dataset</th><th>MAE (pts)</th><th>RMSE (pts)</th><th>R&sup2;</th><th>Max err</th><th>SOH span</th><th>Naive MAE</th><th>RF MAE</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Built with a client-side ONNX LSTM &mdash; no server, no data upload. <a href="https://github.com/" target="_blank" rel="noopener"><svg class="icon icon-sm"><use href="#icon-github"/></svg> View on GitHub</a></p>
+  </footer>
+
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/ort.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
