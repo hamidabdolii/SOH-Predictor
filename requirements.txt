@@ -1,0 +1,11 @@
+# Data processing / training pipeline (not needed to run the web app itself,
+# which is a static site with no server-side dependencies)
+numpy
+pandas
+openpyxl
+scikit-learn
+torch
+onnx
+onnxscript
+onnxruntime
+matplotlib
